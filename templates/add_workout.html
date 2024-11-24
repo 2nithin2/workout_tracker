@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Workout - Workout Tracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .set-container {
+            border: 1px solid #dee2e6;
+            border-radius: 0.25rem;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .set-header {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .set-form {
+            display: none;
+        }
+        .set-form.active {
+            display: block;
+        }
+        .set-counter {
+            color: #6c757d;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">Workout Tracker</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+                <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h2>Add New Workout</h2>
+        <form method="POST" id="workoutForm">
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label for="week_number" class="form-label">Week</label>
+                    <input type="number" class="form-control" id="week_number" name="week_number" required min="1" value="1">
+                </div>
+                <div class="col-md-4">
+                    <label for="day_number" class="form-label">Day</label>
+                    <input type="number" class="form-control" id="day_number" name="day_number" required min="1" max="7" value="1">
+                </div>
+                <div class="col-md-4">
+                    <label for="workout_date" class="form-label">Date</label>
+                    <input type="date" class="form-control" id="workout_date" name="workout_date" required>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="exercise_name" class="form-label">Exercise Name</label>
+                <input type="text" class="form-control" id="exercise_name" name="exercise_name" required
+                    placeholder="e.g., Bench Press, Squats, Deadlifts">
+            </div>
+
+            <div class="mb-3">
+                <label for="muscle_group" class="form-label">Muscle Group</label>
+                <select class="form-control" id="muscle_group" name="muscle_group" required>
+                    <option value="">Select a muscle group</option>
+                    <option value="Chest">Chest</option>
+                    <option value="Back">Back</option>
+                    <option value="Legs">Legs</option>
+                    <option value="Shoulders">Shoulders</option>
+                    <option value="Biceps">Biceps</option>
+                    <option value="Triceps">Triceps</option>
+                    <option value="Core">Core</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="notes" class="form-label">Notes</label>
+                <textarea class="form-control" id="notes" name="notes" rows="3" 
+                    placeholder="Add any notes about your workout (optional)"></textarea>
+            </div>
+
+            <div class="set-counter">Set <span id="currentSetNumber">1</span> of <span id="totalSets">1</span> (Maximum 4 sets)</div>
+
+            <div id="sets_container">
+                <!-- Set forms will be added here -->
+            </div>
+
+            <input type="hidden" id="num_sets" name="num_sets" value="1">
+            <input type="hidden" id="current_set" value="1">
+
+            <div class="d-flex justify-content-between mt-4">
+                <button type="button" class="btn btn-secondary" id="prevSetBtn" style="display: none;">Previous Set</button>
+                <button type="button" class="btn btn-primary" id="nextSetBtn">Next Set</button>
+                <button type="submit" class="btn btn-success" id="submitBtn" style="display: none;">Save Workout</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // Set today's date as default
+        document.getElementById('workout_date').valueAsDate = new Date();
+
+        let currentSet = 1;
+        let totalSets = 1;
+        const MAX_SETS = 4;
+
+        function createSetForm(setNumber) {
+            const setDiv = document.createElement('div');
+            setDiv.className = `set-form ${setNumber === 1 ? 'active' : ''}`;
+            setDiv.id = `set_${setNumber}_form`;
+            setDiv.innerHTML = `
+                <div class="set-container">
+                    <div class="set-header">Set ${setNumber}</div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="reps_${setNumber}" class="form-label">Number of Reps</label>
+                            <input type="number" class="form-control" id="reps_${setNumber}" name="reps_${setNumber}" 
+                                required min="1" placeholder="Enter number of reps">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="weight_${setNumber}" class="form-label">Weight (kg)</label>
+                            <input type="number" class="form-control" id="weight_${setNumber}" name="weight_${setNumber}" 
+                                required step="0.5" min="0" placeholder="Enter weight in kg">
+                        </div>
+                    </div>
+                </div>
+            `;
+            return setDiv;
+        }
+
+        function updateSetCounter() {
+            document.getElementById('currentSetNumber').textContent = currentSet;
+            document.getElementById('totalSets').textContent = totalSets;
+        }
+
+        function showSet(setNumber) {
+            document.querySelectorAll('.set-form').forEach(form => {
+                form.classList.remove('active');
+            });
+            document.getElementById(`set_${setNumber}_form`).classList.add('active');
+
+            // Update navigation buttons
+            document.getElementById('prevSetBtn').style.display = setNumber > 1 ? 'block' : 'none';
+            
+            // Show Next Set button if we haven't reached MAX_SETS yet
+            const showNextButton = totalSets < MAX_SETS || (totalSets === MAX_SETS && currentSet < totalSets);
+            document.getElementById('nextSetBtn').style.display = showNextButton ? 'block' : 'none';
+            
+            // Show Submit button on the last set
+            document.getElementById('submitBtn').style.display = setNumber === totalSets ? 'block' : 'none';
+
+            currentSet = setNumber;
+            updateSetCounter();
+        }
+
+        // Initialize first set
+        const setsContainer = document.getElementById('sets_container');
+        setsContainer.appendChild(createSetForm(1));
+        updateSetCounter();
+
+        // Next Set button handler
+        document.getElementById('nextSetBtn').addEventListener('click', () => {
+            // Validate current set inputs
+            const currentReps = document.getElementById(`reps_${currentSet}`).value;
+            const currentWeight = document.getElementById(`weight_${currentSet}`).value;
+            
+            if (!currentReps || !currentWeight) {
+                alert('Please fill in both reps and weight for the current set.');
+                return;
+            }
+
+            if (currentSet === totalSets && totalSets < MAX_SETS) {
+                // Add new set
+                totalSets++;
+                document.getElementById('num_sets').value = totalSets;
+                setsContainer.appendChild(createSetForm(totalSets));
+            }
+            
+            showSet(currentSet + 1);
+        });
+
+        // Previous Set button handler
+        document.getElementById('prevSetBtn').addEventListener('click', () => {
+            if (currentSet > 1) {
+                showSet(currentSet - 1);
+            }
+        });
+
+        // Form submission handler
+        document.getElementById('workoutForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            // Validate all inputs
+            const exercise = document.getElementById('exercise_name').value;
+            const muscleGroup = document.getElementById('muscle_group').value;
+            const weekNumber = document.getElementById('week_number').value;
+            const dayNumber = document.getElementById('day_number').value;
+            const workoutDate = document.getElementById('workout_date').value;
+            
+            if (!exercise || !muscleGroup || !weekNumber || !dayNumber || !workoutDate) {
+                alert('Please fill in all required fields.');
+                return;
+            }
+
+            // Validate current set
+            const currentReps = document.getElementById(`reps_${currentSet}`).value;
+            const currentWeight = document.getElementById(`weight_${currentSet}`).value;
+            
+            if (!currentReps || !currentWeight) {
+                alert('Please fill in both reps and weight for the current set.');
+                return;
+            }
+
+            // Submit the form
+            e.target.submit();
+        });
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
